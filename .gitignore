@@ -1,0 +1,14 @@
+# Environnement virtuel
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Données locales
+out/
+*.xlsx
+*.csv
+*.log
+
+# Fichiers temporaires
+.DS_Store
