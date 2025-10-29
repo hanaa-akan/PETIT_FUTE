@@ -2,7 +2,7 @@ import asyncio
 from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright
 
-url = "https://www.booking.com/hotel/fr/hoteldefrancevannes.fr.html?aid=2324560&label=actu_weekend_vannes"
+url = "https://www.booking.com/hotel/es/the-westin-alameda-valencia.en.html?aid=2324560&label=actu_quefaire_valence_espagne"
 
 async def get_dynamic_html(url):
     async with async_playwright() as p:

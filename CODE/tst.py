@@ -3,7 +3,6 @@ import pandas as pd
 import ast
 from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright
-import urllib.parse as ul
 
 # ==========================================================
 # 0️⃣ Chargement du fichier
@@ -24,11 +23,12 @@ df_exploded = df.explode("booking_links").reset_index(drop=True)
 
 # Nettoyage : supprimer les NaN et garder que les vrais liens
 df_exploded = df_exploded.dropna(subset=["booking_links"])
-df_exploded = df_exploded[df_exploded["booking_links"].astype(str).str.startswith("http")].reset_index(drop=True)
-
+df_exploded = df_exploded[
+    df_exploded["booking_links"].astype(str).str.startswith("http")
+].reset_index(drop=True)
 
 # ==========================================================
-# 1️⃣ Fonction Playwright
+# 1️⃣ Fonction Playwright : récupérer le HTML dynamique
 # ==========================================================
 async def get_dynamic_html(url):
     async with async_playwright() as p:
@@ -51,37 +51,29 @@ async def get_dynamic_html(url):
         await browser.close()
         return html
 
-
 # ==========================================================
-# 2️⃣ Extraction du bon H2
+# 2️⃣ Fonction extraction H2
 # ==========================================================
-def extract_hotel_h2(html):
+def extract_booking_title(html):
     soup = BeautifulSoup(html, "html.parser")
-    h2_tags = [h.get_text(strip=True) for h in soup.find_all("h2") if h.get_text(strip=True)]
 
+    h2_tags = [h.get_text(strip=True) for h in soup.find_all("h2") if h.get_text(strip=True)]
     if not h2_tags:
         return None
 
-    # Liste élargie de h2 “parasites” à ignorer
-    parasites = [
-        "rechercher", "filtrer", "à proximité", "autres résultats",
-        "publicité", "annonces", "lire aussi", "articles associés",
-        "derniers avis", "vos avis", "vous aimerez aussi",
-        "découvrez aussi", "autres villes", "autres régions",
-        "infos pratiques", "coordonnées"
-    ]
+    # mots-clés à ignorer si c’est le premier h2
+    exclude_first = ["rechercher", "search", "find", "chercher"]
 
-    first = h2_tags[0].lower().strip()
+    first = h2_tags[0].lower()
 
-    # Si le premier h2 est un parasite (court ou mot-clé connu) → prendre le suivant
-    if (len(first) < 20 or any(p in first for p in parasites)) and len(h2_tags) > 1:
+    # si le 1er est une variante de "rechercher" → on prend le suivant
+    if any(word in first for word in exclude_first) and len(h2_tags) > 1:
         return h2_tags[1]
-
-    return h2_tags[0]
-
+    else:
+        return h2_tags[0]
 
 # ==========================================================
-# 3️⃣ Scraper toutes les lignes
+# 3️⃣ Boucle principale : enrichir le DF avec le H2
 # ==========================================================
 async def enrich_with_h2(df, url_col="booking_links"):
     h2_list = []
@@ -91,17 +83,17 @@ async def enrich_with_h2(df, url_col="booking_links"):
             h2_list.append(None)
             continue
         html = await get_dynamic_html(url)
-        h2_text = extract_hotel_h2(html)
+        h2_text = extract_booking_title(html)
         h2_list.append(h2_text)
+        print(f"  → {h2_text}")
     df["balise_h2"] = h2_list
     return df
 
-
 # ==========================================================
-# 4️⃣ Exécution
+# 4️⃣ Exécution globale
 # ==========================================================
 if __name__ == "__main__":
-    print("🚀 Extraction des balises <h2> pour chaque lien Booking...\n")
+    print("🚀 Extraction des balises <h2> Booking...\n")
     df_final = asyncio.run(enrich_with_h2(df_exploded))
 
     sortie = r"C:\Users\Hanaa\Desktop\PETITFUTE\data\outputs\booking_h2_exploded.xlsx"
